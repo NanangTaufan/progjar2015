@@ -1,4 +1,4 @@
-#servertugas2.py
+#clienttugas2.py
 #Nanang Taufan Budiansyah
 #5113100183
 

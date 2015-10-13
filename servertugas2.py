@@ -2,138 +2,162 @@
 #Nanang Taufan Budiansyah
 #5113100183
 
+#inisiasi socket dan string
 import sys
 import socket
 import select
 import string
 
+#mendeklarasikan host, port, list user, list socket, buffer yang diterima
 HOST = 'localhost'
 SOCKET_LIST = []
 NAME_LIST = []
-RECV_BUFFER = 2525
+RECV_BUFFER = 2048
 PORT = 8080
 
 def chat_server():
-
+	
+	#print out port
 	sys.stdout.write('Port : ')
 	PORT = int(sys.stdin.readline())
 
-	#creating TCP/IP socket
+	#untuk membuat socket
 	server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-	# binding the socket
+	# menyambungkan (binding) socket antara server & client
 	server_socket.bind((HOST, PORT))
-	server_socket.listen(10)
+	server_socket.listen(10) #maks client
 
-	# add server socket object to the list of readable connections
+	# menambah server soket untuk mencatat list socket yang ada
 	SOCKET_LIST.append(server_socket)
 
+	#print out awal
 	print "Chat server dimulai dengan port " + str(PORT)
 	
 	while True:
-		# get the list sockets which are ready to be read through select
-		# 4th arg, time_out = 0 : poll and never block
+
+		#Ngambil address dari client
 		ready_to_read,ready_to_write,in_error = select.select(SOCKET_LIST,[],[],0)
 	
+			
 		for sock in ready_to_read:
-			# when new connection request received
+			# ketika ada client baru yang masuk 
 			if sock == server_socket:
+				#ketika client diterima maka muncul notify
 				sockfd, addr = server_socket.accept()
 				SOCKET_LIST.append(sockfd)
 				print "Client (%s, %s) tersambung" % addr
 
-			# a message from a client, not a new connection
+			# pesan dari client (bukan client baru)
 			else:
-				# process data received from client,
+				#proses data diterima dari client
 				try:
-					# receiving data from the socket.
+					# menerima data dari socket
 					data = sock.recv(RECV_BUFFER)
 					if data:
 						#pemisah command dan message
 						temp1 = string.split(data[:-1])
 						d=len(temp1) #panjangnya temp1
+						
 						#pengecekan command
-						if temp1[0]=="login" :
+						if temp1[0]=="login" : #temp index ke 0 apakah login atau bukan
 							log_in(sock, str(temp1[1]))
 						elif temp1[0]=="send" :
 							logged = 0 #cek sudah login/belum
 							user = ""
-							#x merupakan iterator sebanyak banyaknya isi array name_list
+							
+							# x adalah variabel untuk perulangan sebanyak name list
 							for x in range (len(NAME_LIST)):
-								#kalau alamat kita sudah ada di name_list jadi kamu sudah login
+								#jika nama sudah ada di name list maka sudah login
 								if NAME_LIST[x]==sock:
 									logged=1
 									user=NAME_LIST[x+1] 
-							if logged==0:
+							if logged==0: #jika ternyata belum login maka muncul peringatan
 								send_msg(sock, "Login diperlukan\n")
-							else:
-								temp2=""
+							else: #jika sudah masik
+								temp2="" #inisisasi temp2
+								# perulangan x sebanyak panjang temp1
 								for x in range (len(temp1)):
+									# 0 untuk perintah, 1 untuk target, 2 pesannya
 									if x>1: 
 										if not temp2:
 											temp2+=str(temp1[x])
 										#jika pesannya panjang
 										else:
+											# memberikan space
 											temp2+=" "
 											temp2+=str(temp1[x])
-								#ngirim ke target
+											#pengecekan sepanjang x dilakukan mulai dari kata ke 1 sampai kata ke x
+								# mengirim pesan ke target
 								for x in range (len(NAME_LIST)):
 									#temp1[1] nama target yang mau dikirim message
-									if NAME_LIST[x]==temp1[1]:
-										send_msg(NAME_LIST[x-1], "["+user+"] : "+temp2+"\n")
+									if NAME_LIST[x]==temp1[1]: #mengecek nama target di index ke 1
+										send_msg(NAME_LIST[x-1], "["+user+"] : "+temp2+"\n") #target, nama pengirim, isi pesan yg sudah masuk ke temp2
+						#apabila temp1 index ke 0 send all
 						elif temp1[0]=="sendall" :
 							
 							logged = 0
 							user = ""
+							#untuk x sebanyak isi dari namelist (user yg ada)
 							for x in range (len(NAME_LIST)):
-								if NAME_LIST[x]==sock:
+								if NAME_LIST[x]==sock: #jika socket sama dengan name list maka terautentifikasi login
 									logged=1
 									user=NAME_LIST[x+1]
+							#jika belum login
 							if logged==0:
 								send_msg(sock, "Login diperlukan\n")
+							#jika sudah login
 							else:
-								temp2=""
+								temp2="" #inisiasi temp2 untuk pesan
+								#untuk x sepanjang temp1
 								for x in range(len(temp1)):
 									if x!=0:
-										if not temp2:
+										if not temp2:#kalau data belum di temp 2 maka data dipindah ke temp2
 											temp2=str(temp1[x])
 										else:
+											#jika kata lebih dari 1 maka diberi space (spasi)
 											temp2+=" "
 											temp2+=temp1[x]
 								broadcast(server_socket, sock, "["+user+"] : "+temp2+"\n")
+						
 						#lihat user yang terconnect
 						elif temp1[0]=="list" :
 							logged = 0
+							# untuk x sebanyak data dalam name list
 							for x in range (len(NAME_LIST)):
 								if NAME_LIST[x]==sock:
-									logged=1
+									logged=1 #jika nama socket ada pada name list maka terhitung login
+							#jika belum login
 							if logged==0:
 								send_msg(sock, "Login diperlukan\n")
+							#jika sudah login
 							else:
-								temp2=""
+								temp2="" #inisiasi temp2
+								#peulangan sebanyak x dimana x sebanyak data dalam name list
 								for x in range (len(NAME_LIST)):
-									#nyari nama dari array name_list yang berada di index ganjil
+									#nyari nama dari array name_list yang berada di index ganjil karena nama user hanya ada di index ganjil sebab index genap (mulai dari 0) digunakan untuk address
 									if x%2==1:
 										temp2+=" "
-										temp2+=str(NAME_LIST[x])
-								send_msg(sock, "[List_User] : "+temp2+"\n")
+										temp2+=str(NAME_LIST[x]) #memasukkan list dalam array ke dalam temp2
+								send_msg(sock, "[List_User] : "+temp2+"\n") #print out list user
+						#jika perintah diluar send, list, sendall, dan login
 						else:
 							print ('Perintah salah')
 					else:
-						# remove the socket that's broken
+						# menghapus socket yang rusak
 						if sock in SOCKET_LIST:
 							SOCKET_LIST.remove(sock)
 					
-						# at this stage, no data means probably the connection has been broken
+						# jika tidak ada data terkirim maka diasumsikan client terputus
 						broadcast(server_socket, sock, "Client (%s, %s) terputus\n" % addr)
-				# exception
+				# jika client dihentikan smisal f4 atau apapun maka 
 				except:
 					broadcast(server_socket, sock, "Client (%s, %s) terputus\n" % addr)
 					continue
 	server_socket.close()
 
-# broadcast chat messages to all connected clients
+# jika server dihentikan maka akan mengirim pesan ke semua client
 def broadcast (server_socket, sock, message):
 	for x in range (len(NAME_LIST)):
 		# send the message only to peer
@@ -147,6 +171,7 @@ def broadcast (server_socket, sock, message):
 				if NAME_LIST[x] in SOCKET_LIST:
 					SOCKET_LIST.remove(NAME_LIST[x])
 
+#untuk send message
 def send_msg (sock, message):
 	try:
 		sock.send(message)
@@ -154,7 +179,7 @@ def send_msg (sock, message):
 		sock.close()
 		if sock in SOCKET_LIST:
 			SOCKET_LIST.remove(sock)
-
+#untuk login
 def log_in (sock, user):
 	a = 0
 	b = 0

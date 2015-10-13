@@ -5,100 +5,173 @@
 import sys
 import socket
 import select
+import string
 
-HOST = '' 
+HOST = 'localhost'
 SOCKET_LIST = []
-RECV_BUFFER = 8080 
-PORT = 1010
-aye = []
-username = []
-index=0
+NAME_LIST = []
+RECV_BUFFER = 2525
+PORT = 8080
+
 def chat_server():
 
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen(10)
- 
-    # add server socket object to the list of readable connections
-    SOCKET_LIST.append(server_socket)
- 
-    print "Chat server started on port " + str(PORT)
- 
-    while 1:
+	sys.stdout.write('Port : ')
+	PORT = int(sys.stdin.readline())
 
-        # get the list sockets which are ready to be read through select
-        # 4th arg, time_out  = 0 : poll and never block
-        ready_to_read,ready_to_write,in_error = select.select(SOCKET_LIST,[],[],0)
-      
-        for sock in ready_to_read:
-            # a new connection request recieved
-            if sock == server_socket: 
-                sockfd, addr = server_socket.accept()
-                SOCKET_LIST.append(sockfd)
-		aye.append(addr)
-		#print"List :",aye[]
-                print "Client (%s, %s) connected" % addr
-#		print "Isi : ",sockfd
-                 
-#               broadcast(server_socket, sockfd, "[%s:%s] entered our chatting room\n" % addr)
-             
-            # a message from a client, not a new connection
-            else:
-                # process data recieved from client, 
-                try:
-                    # receiving data from the socket.
-                    #data = sock.recv(RECV_BUFFER)
-                    #if data:
-                        # there is something in the socket
-			data2 =sock.recv(6)
-			#print "dapet : ",data2
-			if data2 =='login ' :
-			  username.append(sock.recv(6))
-			 # print "Username" ,username.pop()
-			if data2 =='kirim ' :
-			  data3=sock.recv(6)
-			 # print"index ", username.index(data3)
-			  #print "oke"
-			  tujuan=aye[username.index(data3)]
-			  #print tujuan
-			  data4=sock.recv(RECV_BUFFER)
-			  #print data4
-			  sock.sendto(data4,tujuan)
-			  print tujuan
+	#creating TCP/IP socket
+	server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-			if data2 =='daftar' :
-			  for index in range(len(username)) :
-			      sock.send("\n")
-			      sock.send(username[index])
-			    # print username[index]
-                 	if data2 =='broad ' :
-			 data4=sock.recv(RECV_BUFFER)
-			 aza=aye.index(sock.getpeername())
-			 print aza
-			 #print aye.index(aza)
-		         broadcast(server_socket, sock,"\r" + '['+ str(username[aza]) +'] ' + data4)  
-                # exception 
-                except:
-                    broadcast(server_socket, sock, "Client (%s, %s) is offline\n" % addr)
-                    continue
+	# binding the socket
+	server_socket.bind((HOST, PORT))
+	server_socket.listen(10)
 
-    server_socket.close()
-    
+	# add server socket object to the list of readable connections
+	SOCKET_LIST.append(server_socket)
+
+	print "Chat server dimulai dengan port " + str(PORT)
+	
+	while True:
+		# get the list sockets which are ready to be read through select
+		# 4th arg, time_out = 0 : poll and never block
+		ready_to_read,ready_to_write,in_error = select.select(SOCKET_LIST,[],[],0)
+	
+		for sock in ready_to_read:
+			# when new connection request received
+			if sock == server_socket:
+				sockfd, addr = server_socket.accept()
+				SOCKET_LIST.append(sockfd)
+				print "Client (%s, %s) tersambung" % addr
+
+			# a message from a client, not a new connection
+			else:
+				# process data received from client,
+				try:
+					# receiving data from the socket.
+					data = sock.recv(RECV_BUFFER)
+					if data:
+						#pemisah command dan message
+						temp1 = string.split(data[:-1])
+						d=len(temp1) #panjangnya temp1
+						#pengecekan command
+						if temp1[0]=="login" :
+							log_in(sock, str(temp1[1]))
+						elif temp1[0]=="send" :
+							logged = 0 #cek sudah login/belum
+							user = ""
+							#x merupakan iterator sebanyak banyaknya isi array name_list
+							for x in range (len(NAME_LIST)):
+								#kalau alamat kita sudah ada di name_list jadi kamu sudah login
+								if NAME_LIST[x]==sock:
+									logged=1
+									user=NAME_LIST[x+1] 
+							if logged==0:
+								send_msg(sock, "Login diperlukan\n")
+							else:
+								temp2=""
+								for x in range (len(temp1)):
+									if x>1: 
+										if not temp2:
+											temp2+=str(temp1[x])
+										#jika pesannya panjang
+										else:
+											temp2+=" "
+											temp2+=str(temp1[x])
+								#ngirim ke target
+								for x in range (len(NAME_LIST)):
+									#temp1[1] nama target yang mau dikirim message
+									if NAME_LIST[x]==temp1[1]:
+										send_msg(NAME_LIST[x-1], "["+user+"] : "+temp2+"\n")
+						elif temp1[0]=="sendall" :
+							
+							logged = 0
+							user = ""
+							for x in range (len(NAME_LIST)):
+								if NAME_LIST[x]==sock:
+									logged=1
+									user=NAME_LIST[x+1]
+							if logged==0:
+								send_msg(sock, "Login diperlukan\n")
+							else:
+								temp2=""
+								for x in range(len(temp1)):
+									if x!=0:
+										if not temp2:
+											temp2=str(temp1[x])
+										else:
+											temp2+=" "
+											temp2+=temp1[x]
+								broadcast(server_socket, sock, "["+user+"] : "+temp2+"\n")
+						#lihat user yang terconnect
+						elif temp1[0]=="list" :
+							logged = 0
+							for x in range (len(NAME_LIST)):
+								if NAME_LIST[x]==sock:
+									logged=1
+							if logged==0:
+								send_msg(sock, "Login diperlukan\n")
+							else:
+								temp2=""
+								for x in range (len(NAME_LIST)):
+									#nyari nama dari array name_list yang berada di index ganjil
+									if x%2==1:
+										temp2+=" "
+										temp2+=str(NAME_LIST[x])
+								send_msg(sock, "[List_User] : "+temp2+"\n")
+						else:
+							print ('Perintah salah')
+					else:
+						# remove the socket that's broken
+						if sock in SOCKET_LIST:
+							SOCKET_LIST.remove(sock)
+					
+						# at this stage, no data means probably the connection has been broken
+						broadcast(server_socket, sock, "Client (%s, %s) terputus\n" % addr)
+				# exception
+				except:
+					broadcast(server_socket, sock, "Client (%s, %s) terputus\n" % addr)
+					continue
+	server_socket.close()
+
 # broadcast chat messages to all connected clients
 def broadcast (server_socket, sock, message):
-    for socket in SOCKET_LIST:
-        # send the message only to peer
-        if socket != server_socket and socket != sock :
-            try :
-                socket.sendall(message)
-            except :
-                # broken socket connection
-                socket.close()
-                # broken socket, remove it
-                if socket in SOCKET_LIST:
-                    SOCKET_LIST.remove(socket)
- 
-if __name__ == "__main__":
+	for x in range (len(NAME_LIST)):
+		# send the message only to peer
+		if NAME_LIST[x] != server_socket and NAME_LIST[x] != sock and x%2==0 :
+			try :
+				NAME_LIST[x].send(message)
+			except :
+				# broken socket connection
+				NAME_LIST[x].close()
+				# broken socket, remove it
+				if NAME_LIST[x] in SOCKET_LIST:
+					SOCKET_LIST.remove(NAME_LIST[x])
 
-    sys.exit(chat_server())       
+def send_msg (sock, message):
+	try:
+		sock.send(message)
+	except:
+		sock.close()
+		if sock in SOCKET_LIST:
+			SOCKET_LIST.remove(sock)
+
+def log_in (sock, user):
+	a = 0
+	b = 0
+	for name in NAME_LIST:
+		if name == user:
+			a = 1
+		if name == sock:
+			b = 1
+
+	if a==1:
+		send_msg(sock, "Anda Sudah login\n")
+	elif b==1:
+		send_msg(sock, "Username sudah dipakai\n")
+	else:
+		#masukkan data user ke array
+		NAME_LIST.append(sock)
+		NAME_LIST.append(user)
+		send_msg(sock, "Login berhasil\n")
+
+chat_server()

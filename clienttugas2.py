@@ -2,6 +2,7 @@
 #Nanang Taufan Budiansyah
 #5113100183
 
+#inisiasi socket dan string
 import sys
 import socket
 import select
@@ -11,13 +12,14 @@ import string
 def chat_client():
 	host = 'localhost'
 
+	#print out port dan inputan port
 	sys.stdout.write('Port : ')
 	port = int(sys.stdin.readline())
 
-	# create TCP/IP socket
+	# membuat socket
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-	# connect to remote host
+	# menghubungkan ke server
 	try :
 		s.connect((host, port))
 	except :
@@ -30,52 +32,54 @@ def chat_client():
 	while 1:
 		socket_list = [sys.stdin, s]
 
-		# Get the list sockets which are readable
+		# mendapatkan socket list yang terdaftar
 		ready_to_read,ready_to_write,in_error = select.select(socket_list , [], [])
 		for sock in ready_to_read:
 			if sock == s:
-				# incoming message from remote server, s
-				data = sock.recv(2525)
+				# menunggu jawaban dari server apakah sudah terhubung dengan server atau belum
+				data = sock.recv(2048)
 				if not data :
 					print '\nAnda tidak terhubung'
 					sys.exit()
 				else :
-					#print data
+					#print data uang diterima
 					sys.stdout.write(data)
 					sys.stdout.write('Pesan: '); sys.stdout.flush()
 			else :
-				# user entered a message
+				# user menuliskan pesannya
 				msg = []
 				temp = sys.stdin.readline()
-				temp1 = string.split(temp[:-1])
+				temp1 = string.split(temp[:-1]) #dimulai dari index ke 0
 				
-				#menghitung jumlah input
+				# menghitung jumlah inputan
 				kata=len(temp1)
+				#jika inputan index ke 0 adalah login
 				if temp1[0]=="login" :
-					if kata>2:
-						print('Username hanya satu kata saja')
-					elif kata<2:
+					if kata<2:
 						print('Masukkan username untuk login')
+					elif kata>2:
+						print('Username hanya satu kata saja')
 					else:
 						s.send(temp)
-
+				#jika index ke 0 adalah send
 				elif temp1[0]=="send" :
 					if kata<3:
-						print('Perintah salah')
+						print('Perintah salah, tentukan user tujuan dan isikan pesan anda setelahnya')
 					else:
 						s.send(temp)
-			
+				#jika index ke 0 adalah sendall/broadcast
 				elif temp1[0]=="sendall" :
 					if kata<2:
 						print("Perintah salah")
 					else:
 						s.send(temp)
-		
+				#untuk menampilkan list user yang aktif saat itu
 				elif temp1[0]=="list" :
 					if kata>1:
 						print('Perintah salah')
 					else:
 						s.send(temp)
+				#jika perintah diluar 4 yang diatas maka perintah dinyatakan salah
 				else:
 					print ('Perintah salah')
 					
